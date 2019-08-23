@@ -7,9 +7,9 @@ class StepReader {
   StepReader(const std::string& file_name);
   ~StepReader();
 
-  bool is_open() { return is_open_; }
+  bool succeeded() { return succeeded_; }
   
  private:
   std::string file_name_;
-  bool is_open_ = false;
+  bool succeeded_ = false;
 };

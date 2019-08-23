@@ -5,7 +5,7 @@
 int main(int argc, char const *argv[])
 {
   StepReader reader("models/cube806020.step");
-  std::cout << reader.is_open() << std::endl;
+  std::cout << reader.succeeded() << std::endl;
 
   // while (true)
   // {
