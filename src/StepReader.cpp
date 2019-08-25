@@ -17,6 +17,15 @@
 #include <TCollection_AsciiString.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TCollection_ExtendedString.hxx>
+#include <GProp_GProps.hxx>
+#include <BRepGProp.hxx>
+#include <gp_Pnt.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_OBB.hxx>
+
+#include <TopExp.hxx>
+#include <BRepExtrema_ShapeProximity.hxx>
+#include <TopoDS_Builder.hxx>
 
 class FileDialog {
  private:
@@ -36,7 +45,7 @@ class Geometry {
 };
 
 StepReader::StepReader(const std::string& file_name) : file_name_(file_name) {
-  static STEPControl_Reader reader; 
+  STEPControl_Reader reader; 
   IFSelect_ReturnStatus stat = reader.ReadFile(file_name_.c_str());
   switch (stat)
   {
@@ -54,32 +63,28 @@ StepReader::StepReader(const std::string& file_name) : file_name_(file_name) {
   IFSelect_PrintCount mode = IFSelect_CountByItem;
   reader.PrintCheckLoad(show_error_fails_only, mode);
 
-  reader.ClearShapes();
+  // Standard_Integer nb_roots = reader.NbRootsForTransfer();
+  // std::cout << "Number of roots in STEP file: " << nb_roots << std::endl;
+  // Standard_Integer nb_trans = reader.TransferRoots();
+  // std::cout << "STEP roots transferred: " << nb_trans << std::endl;
+  // std::cout << "Number of resulting shapes is: " << reader.NbShapes() << std::endl;
+  // reader.PrintCheckTransfer(show_error_fails_only, mode);
 
-  Standard_Integer nb_roots = reader.NbRootsForTransfer();
-  std::cout << "Number of roots in STEP file: " << nb_roots << std::endl;
-  Standard_Integer nb_trans = reader.TransferRoots();
-  std::cout << "STEP roots transferred: " << nb_trans << std::endl;
-  std::cout << "Number of resulting shapes is: " << reader.NbShapes() << std::endl;
-  reader.PrintCheckTransfer(show_error_fails_only, mode);
-
-  Handle(Standard_Type) tNAUO = STANDARD_TYPE(StepRepr_NextAssemblyUsageOccurrence);
   Handle(Standard_Type) tPD  = STANDARD_TYPE(StepBasic_ProductDefinition);
   Handle(TCollection_HAsciiString) name;
-  TDF_Label L;
 
   Interface_EntityIterator iter = reader.StepModel().get()->Entities();
   for (iter.Start(); iter.More(); iter.Next())
   {
-
+    reader.ClearShapes();
     Handle(Standard_Transient) enti = iter.Value();
     // for PD get name of associated product
-    if ( enti->DynamicType() == tPD ) {
-      L.Nullify();
-      Handle(StepBasic_ProductDefinition) PD = 
-        Handle(StepBasic_ProductDefinition)::DownCast(enti);
+    if (enti->DynamicType() == tPD) {
+      Handle(StepBasic_ProductDefinition) PD = Handle(StepBasic_ProductDefinition)::DownCast(enti);
       if(PD.IsNull()) continue;
       Handle(StepBasic_Product) Prod = (!PD->Formation().IsNull() ? PD->Formation()->OfProduct() : NULL);
+      reader.TransferEntity(enti);
+      TopoDS_Shape shape = reader.OneShape();
       if (Prod.IsNull())
         name = new TCollection_HAsciiString;
       else if (!Prod->Name().IsNull() && Prod->Name()->UsefullLength() > 0) 
@@ -88,12 +93,22 @@ StepReader::StepReader(const std::string& file_name) : file_name_(file_name) {
         name = Prod->Id();
       else 
         name = new TCollection_HAsciiString;
-      TCollection_ExtendedString str ( name->String() );
+      TCollection_ExtendedString str(name->String());
       std::cout << str << std::endl;
+      GProp_GProps propertiesSystemFace;
+      BRepGProp::VolumePropertiesGK(shape, propertiesSystemFace);
+      double shapeVolume = propertiesSystemFace.Mass();
+      gp_Pnt centerOfMass = propertiesSystemFace. CentreOfMass();
+      std::cout << shapeVolume <<std::endl;
+      std::cout << centerOfMass.X() << " " << centerOfMass.Y() << " " << centerOfMass.Z() <<std::endl;
+
+      Bnd_OBB box;
+      BRepBndLib bndlib;
+      bndlib.AddOBB(shape, box);
+      std::cout << box.XHSize() << " " << box.YHSize() << " " << box.ZHSize() <<std::endl;
     }
   }
-  
-  TopoDS_Shape result = reader.OneShape();
+
 }
 
 StepReader::~StepReader() {}
