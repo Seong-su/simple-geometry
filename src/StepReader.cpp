@@ -23,9 +23,11 @@
 #include <BRepBndLib.hxx>
 #include <Bnd_OBB.hxx>
 
+#include <TopoDS.hxx>
 #include <TopExp.hxx>
 #include <BRepExtrema_ShapeProximity.hxx>
 #include <TopoDS_Builder.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 
 class FileDialog {
  private:
@@ -65,10 +67,37 @@ StepReader::StepReader(const std::string& file_name) : file_name_(file_name) {
 
   // Standard_Integer nb_roots = reader.NbRootsForTransfer();
   // std::cout << "Number of roots in STEP file: " << nb_roots << std::endl;
-  // Standard_Integer nb_trans = reader.TransferRoots();
+  Standard_Integer nb_trans = reader.TransferRoots();
   // std::cout << "STEP roots transferred: " << nb_trans << std::endl;
   // std::cout << "Number of resulting shapes is: " << reader.NbShapes() << std::endl;
-  // reader.PrintCheckTransfer(show_error_fails_only, mode);
+  reader.PrintCheckTransfer(show_error_fails_only, mode);
+
+  TopoDS_Shape shape = reader.OneShape();
+  
+  TopTools_IndexedMapOfShape mapOfShapes;
+  TopExp::MapShapes(shape, TopAbs_SOLID, mapOfShapes);
+  std::cout << mapOfShapes.Extent() << " solids found in STEP file." << std::endl;
+
+  for (int ii = 1; ii < mapOfShapes.Extent(); ++ii)
+  {
+    const TopoDS_Solid& solid1 = TopoDS::Solid(mapOfShapes(ii));
+    for (int jj = ii + 1; jj <= mapOfShapes.Extent(); ++jj)
+    {
+      const TopoDS_Solid& solid2 = TopoDS::Solid(mapOfShapes(jj));
+      BRepAlgoAPI_Common cmnBuilder(solid1, solid2);
+      cmnBuilder.Check();
+      if (cmnBuilder.IsDone() && !cmnBuilder.HasErrors() && cmnBuilder.HasGenerated())
+      {
+        TopoDS_Shape intersection = cmnBuilder.Shape();
+        Bnd_OBB box;
+        BRepBndLib bndlib;
+        bndlib.AddOBB(intersection, box);
+        std::cout << "Intersection: " << 2*box.XHSize() << " " << 2*box.YHSize() << " " << 2*box.ZHSize() <<std::endl;
+      }
+
+    }
+  }
+
 
   Handle(Standard_Type) tPD  = STANDARD_TYPE(StepBasic_ProductDefinition);
   Handle(TCollection_HAsciiString) name;

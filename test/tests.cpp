@@ -4,6 +4,6 @@
 #include <StepReader.hpp>
 
 TEST(Step, Reader) {
-  StepReader reader("models/Cubes.step"); 
+  StepReader reader("models/4Cubes.step"); 
   EXPECT_TRUE(reader.succeeded());
 }
